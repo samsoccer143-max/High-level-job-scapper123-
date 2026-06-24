@@ -21,29 +21,16 @@ jobs:
       - name: Install Scraper Requirements
         run: pip install requests beautifulsoup4
 
-     - name: Run Scraper Script
-      continue-on-error: true
-      env:
-        TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      run: python scraper.py
+      - name: Run Scraper Script
+        continue-on-error: true
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scraper.py
 
-    - name: Run IGN Entertainment Review Matrix
-      continue-on-error: true
-      env:
-        TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      run: python ign_scraper.py
-
-
-
-
-
-
-
-
-
-
-
-
-
+      - name: Run IGN Entertainment Review Matrix
+        continue-on-error: true
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python ign_scraper.py
