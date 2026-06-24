@@ -1,0 +1,28 @@
+name: Daily Govt Job Monitor
+
+on:
+  schedule:
+    # Runs automatically every single day at 05:00 AM UTC (10:30 AM Indian Standard Time)
+    - cron: '0 5 * * *'
+  workflow_dispatch: # Allows you to also trigger it manually anytime with a single click
+
+jobs:
+  run-scraper:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v4
+
+      - name: Initialize Cloud Python Engine
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Scraper Requirements
+        run: pip install requests beautifulsoup4
+
+      - name: Run Scraper Script
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scraper.py
