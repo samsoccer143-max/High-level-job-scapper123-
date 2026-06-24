@@ -1,17 +1,28 @@
-name: Hugging Face Keep-Alive Alarm
+name: Daily Govt Job Monitor
 
 on:
   schedule:
-    # This triggers the alarm automatically every morning at 5:30 AM IST (00:00 UTC)
-    - cron: '0 0 * * *'
-  workflow_dispatch: # Allows you to also trigger it manually whenever you want
+    # Runs automatically every single day at 05:00 AM UTC (10:30 AM Indian Standard Time)
+    - cron: '0 5 * * *'
+  workflow_dispatch: # Allows you to also trigger it manually anytime with a single click
 
 jobs:
-  wake-up-space:
+  run-scraper:
     runs-on: ubuntu-latest
     steps:
-      - name: Send Wake Up Signal to Hugging Face
-        run: |
-          echo "Waking up the Govt Job Monitor Space..."
-          curl -sL "https://huggingface.co/spaces/Blastire/govt-job-monitor" > /dev/null
-          echo "Signal successfully transmitted!"
+      - name: Checkout repository code
+        uses: actions/checkout@v4
+
+      - name: Initialize Cloud Python Engine
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Scraper Requirements
+        run: pip install requests beautifulsoup4
+
+      - name: Run Scraper Script
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scraper.py
