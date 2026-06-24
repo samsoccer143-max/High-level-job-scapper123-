@@ -23,7 +23,6 @@ PORTAL_FEEDS = [
     "https://www.sarkarinaukriblog.com/feeds/posts/default/-/Officer" 
 ]
 
-# UPDATED: Changed from TELEGRAM_BOT_TOKEN to TELEGRAM_TOKEN
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
@@ -53,13 +52,13 @@ def parse_age_limit(text_corpus):
     return int(age_match.group(1)) if age_match else None
 
 def send_telegram_notification(message):
-    # UPDATED: Using TELEGRAM_TOKEN
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         print("Telegram configuration missing. Check your GitHub Secrets setup.")
         return
         
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
+    # FIX: Changed parse_mode to HTML to prevent special characters from breaking URLs
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
     
     try:
         response = requests.post(url, json=payload, timeout=15)
@@ -92,10 +91,21 @@ def run_screener():
             for entry in entries:
                 title = entry.find('title').text.strip() if entry.find('title') else ""
                 
-                link_tag = entry.find('link')
+                # FIX: Target the specific user-facing article webpage link ("alternate")
                 link = ""
-                if link_tag:
-                    link = link_tag.get('href') or link_tag.text.strip()
+                link_tags = entry.find_all('link')
+                for tag in link_tags:
+                    if tag.get('rel') == 'alternate':
+                        link = tag.get('href')
+                        break
+                
+                # Fallback filter mapping if attributes aren't cleanly indexed
+                if not link and link_tags:
+                    for tag in link_tags:
+                        href = tag.get('href')
+                        if href and href.startswith('http'):
+                            link = href
+                            break
                 
                 if not link or link in seen_links:
                     continue
@@ -121,14 +131,15 @@ def run_screener():
             print(f"Error accessing feed {feed_url}: {e}")
 
     if eligible_jobs:
-        alert_body = f"🚨 *High-Pay Govt Jobs Matching Your Profile!* 🚨\n"
+        # FIX: Switched layout compilation formatting to HTML standard syntax
+        alert_body = f"🚨 <b>High-Pay Govt Jobs Matching Your Profile!</b> 🚨\n"
         alert_body += f"👤 Your Calculated Age: {current_age} years\n"
         alert_body += f"📅 Checked On: {datetime.today().strftime('%d-%b-%Y')}\n\n"
         
         for index, job in enumerate(eligible_jobs, 1):
-            alert_body += f"{index}. *{job['title']}*\n"
+            alert_body += f"{index}. <b>{job['title']}</b>\n"
             alert_body += f"   Target Age Bracket Max: {job['max_age']}\n"
-            alert_body += f"   🔗 [View Details & Apply Here]({job['link']})\n\n"
+            alert_body += f"   🔗 <a href=\"{job['link']}\">View Details & Apply Here</a>\n\n"
             
         send_telegram_notification(alert_body)
     else:
