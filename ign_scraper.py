@@ -2,11 +2,11 @@ import os
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
+import html
 
 # ==========================================
 # IGN SYNDICATION HOOKS
 # ==========================================
-# Using the primary, ultra-stable Feedburner route for all categories
 TARGET_FEED = "http://feeds.feedburner.com/ign/all.xml"
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -44,15 +44,17 @@ def scrape_ign_reviews():
             print(f"Target syndicate endpoint down. Network code dropped: {response.status_code}")
             return
             
-        soup = BeautifulSoup(response.content, 'html.parser')
+        # FIX: Switched layout logic to native xml-text parser mode to completely avoid lxml dependencies and kill the warning
+        soup = BeautifulSoup(response.content, features="xml")
         items = soup.find_all('item')
         
         extracted_reviews = []
         
         for item in items:
-            title = item.find('title').text.strip() if item.find('title') else "Unknown Review Title"
+            title_raw = item.find('title').text.strip() if item.find('title') else "Unknown Review Title"
+            # Escape HTML characters from titles (e.g., changes "&" to "&amp;")
+            title = html.escape(title_raw)
             
-            # Filter Strategy: Ensure we are only picking items explicitly tagged as a "Review"
             if "review" not in title.lower():
                 continue
                 
@@ -61,21 +63,23 @@ def scrape_ign_reviews():
                 link = item.find('link').text.strip()
             
             description_tag = item.find('description') or item.find('summary')
-            description = description_tag.text.strip() if description_tag else "No review summary payload available."
-            # Strip internal tags and clamp text safely
-            description = BeautifulSoup(description, "html.parser").text[:120].strip() + "..."
+            description_raw = description_tag.text.strip() if description_tag else "No review summary payload available."
             
-            # Clean video suffix injection
+            # FIX: Double parse the data snippet to aggressively extract pure text inside CDATA blocks and drop dangerous HTML fragments
+            clean_desc = BeautifulSoup(description_raw, "html.parser").text
+            
+            # Clean characters and slice string down to fit inside text parameters
+            clean_desc = html.escape(clean_desc)[:120].strip() + "..."
+            
             video_link = link + "-video" if link and not link.endswith('/') else link
             
             extracted_reviews.append({
                 "title": title,
-                "summary": description,
+                "summary": clean_desc,
                 "url": link,
                 "video": video_link
             })
             
-            # Cap execution processing depth at the top 5 most recent reviews
             if len(extracted_reviews) >= 5:
                 break
             
