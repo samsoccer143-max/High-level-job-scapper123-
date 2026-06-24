@@ -1,149 +1,114 @@
-import os
-import requests
+@@ -4,52 +4,87 @@
 from bs4 import BeautifulSoup
 from datetime import datetime
-import re
 
-# ==========================================
-# 1. USER CONFIGURATION (DOB: 1-May-1994)
-# ==========================================
-DOB = "1994-05-01"  
-REQUIRED_EXP = 4    
+# --- CONFIGURATION ---
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = str(os.environ.get("TELEGRAM_CHAT_ID", "")).strip().replace('"', '').replace("'", "")
 
-QUALIFICATION_KEYWORDS = ["computer science", "cs", "it", "information technology", "b.tech", "m.tech", "mca", "software engineer"]
+# Add more portals here. Structure: "Name": (URL, CSS_Selector_For_Rows)
+# --- ALL MAJOR GOVT PORTALS TRACKING MATRIX ---
+PORTALS = {
+    "NCS": ("https://betacloud.ncs.gov.in/latest-update", "tr"),
+    "CDAC": ("https://www.cdac.in/index.aspx?id=current_jobs", "tr"),
+    "NIC": ("https://www.nic.in/recruitment/", "div.rec-item"),
+    "Digital India": ("https://www.digitalindia.gov.in/opportunities", "div.job-row")
+    "National Career Service (NCS)": "https://betacloud.ncs.gov.in/latest-update",
+    "Andaman eRecruitment Portal": "https://erecruitment.andamannicobar.gov.in/",
+    "UPSC Current Openings": "https://www.upsc.gov.in/whats-new",
+    "SSC Recruitment Notifications": "https://ssc.gov.in/candidate-portal/notices",
+    "Digital India Careers": "https://www.digitalindia.gov.in/opportunities",
+    "CDAC Tech Openings": "https://www.cdac.in/index.aspx?id=current_jobs",
+    "NIC (National Informatics Centre)": "https://www.nic.in/recruitment/"
+}
 
+HIGH_PAY_KEYWORDS = [r"scientist", r"technical officer", r"programmer", r"system analyst", r"software engineer"]
+# Your exact high-pay tech matrix keywords
 HIGH_PAY_KEYWORDS = [
-    "level 10", "level 11", "level 12", "level 13", "level-10", "level-11", "level-12",
-    "scientist c", "scientist d", "grade b", "scale ii", "scale iii", "scale iv", 
-    "manager", "system analyst", "executive engineer", "ctc"
+    r"scientist\s*[b-d]", r"technical\s*officer", r"programmer", 
+    r"system\s*analyst", r"software\s*engineer", r"it\s*officer",
+    r"computer science"
 ]
 
-PORTAL_FEEDS = [
-    "https://www.sarkarinaukriblog.com/feeds/posts/default", 
-    "https://www.sarkarinaukriblog.com/feeds/posts/default/-/Officer" 
-]
-
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-
-def calculate_current_age(dob_str):
-    birth_date = datetime.strptime(dob_str, "%Y-%m-%d")
-    today = datetime.today()
-    age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
-    return age
-
-def check_eligibility(title, content):
-    text_corpus = (title + " " + content).lower()
-    
-    if not any(kw in text_corpus for kw in QUALIFICATION_KEYWORDS):
-        return False
-        
-    if not any(kw in text_corpus for kw in HIGH_PAY_KEYWORDS):
-        return False
-        
-    exp_indicators = ["experience", "years", "yrs", "scale ii", "scale iii", "scientist c"]
-    if not any(indicator in text_corpus for indicator in exp_indicators):
-        return False
-        
-    return True
-
-def parse_age_limit(text_corpus):
-    age_match = re.search(r'(?:max(?:imum)?\s+age.*?|age\s+limit.*?|up\s+to\s+)(\d{2})', text_corpus, re.IGNORECASE)
-    return int(age_match.group(1)) if age_match else None
-
-def send_telegram_notification(message):
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        print("Telegram configuration missing. Check your GitHub Secrets setup.")
-        return
-        
+def send_telegram_alert(message):
+    print("Routing message dispatch via open GitHub tunnel...")
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    # FIX: Changed parse_mode to HTML to prevent special characters from breaking URLs
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML", "disable_web_page_preview": True}
+    
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True
+    }
     
     try:
-        response = requests.post(url, json=payload, timeout=15)
-        if response.status_code == 200:
-            print("Telegram alert pushed successfully!")
-        else:
-            print(f"Telegram error: {response.text}")
+        requests.post(url, json=payload, timeout=15)
+        res = requests.post(url, json=payload, timeout=15)
+        print(f"Telegram API Response Status Code: {res.status_code}")
     except Exception as e:
-        print(f"Failed sending Telegram alert: {e}")
+        print(f"Telegram error: {e}")
+        print(f"Network processing exception: {e}")
 
-def run_screener():
-    current_age = calculate_current_age(DOB)
-    print(f"Starting Scraper. Calculated Age: {current_age} (DOB: {DOB})")
-    
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-    eligible_jobs = []
-    seen_links = set() 
-    
-    for feed_url in PORTAL_FEEDS:
+def run_scraper_cycle():
+    session = requests.Session()
+    session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+    print(f"Execution window opened at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    consolidated_matches = []
+
+    print(f"--- Scan started at {datetime.now()} ---")
+    # Persistent session with browser identity masking
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Connection": "keep-alive"
+    })
+
+    for name, (url, selector) in PORTALS.items():
+    for name, endpoint in PORTALS.items():
+        print(f"Querying portal: {name}")
         try:
-            print(f"Fetching updates from live portal feed: {feed_url}")
-            response = requests.get(feed_url, headers=headers, timeout=20)
-            if response.status_code != 200:
-                print(f"Skipping feed. Status code: {response.status_code}")
-                continue
-                
-            soup = BeautifulSoup(response.content, 'html.parser')
-            entries = soup.find_all('entry') or soup.find_all('item')
+            res = session.get(url, timeout=20)
+            res = session.get(endpoint, timeout=20, allow_redirects=True)
+            print(f"Portal {name} responded with HTTP: {res.status_code}")
             
-            for entry in entries:
-                title = entry.find('title').text.strip() if entry.find('title') else ""
-                
-                # FIX: Target the specific user-facing article webpage link ("alternate")
-                link = ""
-                link_tags = entry.find_all('link')
-                for tag in link_tags:
-                    if tag.get('rel') == 'alternate':
-                        link = tag.get('href')
-                        break
-                
-                # Fallback filter mapping if attributes aren't cleanly indexed
-                if not link and link_tags:
-                    for tag in link_tags:
-                        href = tag.get('href')
-                        if href and href.startswith('http'):
-                            link = href
-                            break
-                
-                if not link or link in seen_links:
-                    continue
-                    
-                content_tag = entry.find('content') or entry.find('description') or entry.find('summary')
-                content = content_tag.text.strip() if content_tag else ""
-                
-                if check_eligibility(title, content):
-                    max_age = parse_age_limit(content)
-                    
-                    if max_age and current_age > max_age:
-                        print(f"Skipped: {title} (Age limit {max_age} exceeded current age {current_age})")
-                        continue
-                        
-                    seen_links.add(link)
-                    eligible_jobs.append({
-                        "title": title,
-                        "link": link,
-                        "max_age": max_age or "Not specified (Check link)"
-                    })
-                    
-        except Exception as e:
-            print(f"Error accessing feed {feed_url}: {e}")
+            if res.status_code == 200:
+                soup = BeautifulSoup(res.text, 'html.parser')
+                # Find rows based on the specific CSS selector for that site
+                for item in soup.select(selector):
+                    text = item.get_text(" ", strip=True).lower()
+                # Check both hyperlinked text and general table cells for keyword matches
+                for element in soup.find_all(['a', 'td', 'li']):
+                    text = element.get_text(strip=True)
+                    href = element.get('href', '') if element.name == 'a' else ''
 
-    if eligible_jobs:
-        # FIX: Switched layout compilation formatting to HTML standard syntax
-        alert_body = f"🚨 <b>High-Pay Govt Jobs Matching Your Profile!</b> 🚨\n"
-        alert_body += f"👤 Your Calculated Age: {current_age} years\n"
-        alert_body += f"📅 Checked On: {datetime.today().strftime('%d-%b-%Y')}\n\n"
-        
-        for index, job in enumerate(eligible_jobs, 1):
-            alert_body += f"{index}. <b>{job['title']}</b>\n"
-            alert_body += f"   Target Age Bracket Max: {job['max_age']}\n"
-            alert_body += f"   🔗 <a href=\"{job['link']}\">View Details & Apply Here</a>\n\n"
-            
-        send_telegram_notification(alert_body)
+                    if any(re.search(k, text) for k in HIGH_PAY_KEYWORDS):
+                        # Extracting a link
+                        link = item.find('a')['href'] if item.find('a') else url
+                        if not link.startswith('http'): link = "https://" + url.split('/')[2] + link
+                        
+                        alert = f"💎 <b>Match found on {name}!</b>\n\n{item.get_text(strip=True)[:200]}...\n📍 <a href='{link}'>View Details</a>"
+                        send_telegram_alert(alert)
+                    for pattern in HIGH_PAY_KEYWORDS:
+                        if re.search(pattern, text, re.IGNORECASE):
+                            link = href if href.startswith('http') else endpoint
+                            match_entry = f"💎 <b>{text}</b>\n🏛️ <i>Source: {name}</i>\n📍 Link: {link}"
+                            if match_entry not in consolidated_matches:
+                                consolidated_matches.append(match_entry)
+                            break
+        except Exception as e:
+            print(f"Failed to scan {name}: {e}")
+            print(f"Network restriction or block on {name}: {e}")
+            continue
+
+    if consolidated_matches:
+        # Group into clean readable sections if multiple jobs are found
+        alert_body = "🚀 <b>New Govt Tech Jobs Found!</b>\n\n" + "\n\n---\n\n".join(consolidated_matches)
+        send_telegram_alert(alert_body)
     else:
-        print("No matches tracked during today's update cycle.")
+        send_telegram_alert("🔍 <b>Daily Scan Complete:</b> Checked all central & local govt portals. No new job postings match your tech matrix today.")
 
 if __name__ == "__main__":
-    run_screener()
+    run_scraper_cycle()
