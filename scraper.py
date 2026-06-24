@@ -6,7 +6,6 @@ from bs4 import BeautifulSoup
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-# Targeting open, scraper-friendly endpoints
 PORTALS = {
     "National Career Service (NCS)": "https://betacloud.ncs.gov.in/latest-update",
     "Andaman eRecruitment Portal": "https://erecruitment.andamannicobar.gov.in/"
@@ -22,20 +21,27 @@ def send_telegram_alert(message):
     telegram_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
     try:
-        requests.post(telegram_url, json=payload, timeout=10)
+        response = requests.post(telegram_url, json=payload, timeout=10)
+        print(f"Telegram API Response Status: {response.status_code}")
     except Exception as e:
         print(f"Failed to send Telegram ping: {e}")
 
 def run_pipeline():
+    # --- HEARTBEAT PING (Verifies your setup works immediately) ---
+    print("Sending connection test ping to Telegram...")
+    send_telegram_alert("⚡ *Govt Job Monitor Link Active:* Script successfully initialized in the cloud. Beginning portal scans...")
+
     consolidated_matches = []
-    # Setting a real browser identity header to bypass basic web filters
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
     
     for name, endpoint in PORTALS.items():
         try:
+            print(f"Querying portal: {name}")
             res = requests.get(endpoint, headers=headers, timeout=15)
+            print(f"Portal {name} responded with HTTP: {res.status_code}")
+            
             if res.status_code == 200:
                 soup = BeautifulSoup(res.text, 'html.parser')
                 for anchor in soup.find_all('a'):
@@ -51,12 +57,12 @@ def run_pipeline():
             print(f"Skipping {name} due to network restriction: {e}")
             continue
 
-    # --- FORCED GUARANTEED MESSAGE ---
+    # --- FINAL SCAN RESULTS ---
     if consolidated_matches:
         alert_body = "🚀 *New Govt Tech/Teaching Jobs Found!*\n\n" + "\n\n".join(consolidated_matches)
         send_telegram_alert(alert_body)
     else:
-        send_telegram_alert("🔍 *Daily Scan Active:* Portals checked successfully. No new matching tech or teaching posts found today.")
+        send_telegram_alert("🔍 *Scan Finished:* Checked active endpoints. No new matching tech or teaching postings found right now.")
 
 if __name__ == "__main__":
     run_pipeline()
