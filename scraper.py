@@ -23,7 +23,8 @@ PORTAL_FEEDS = [
     "https://www.sarkarinaukriblog.com/feeds/posts/default/-/Officer" 
 ]
 
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+# UPDATED: Changed from TELEGRAM_BOT_TOKEN to TELEGRAM_TOKEN
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 def calculate_current_age(dob_str):
@@ -52,11 +53,12 @@ def parse_age_limit(text_corpus):
     return int(age_match.group(1)) if age_match else None
 
 def send_telegram_notification(message):
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+    # UPDATED: Using TELEGRAM_TOKEN
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         print("Telegram configuration missing. Check your GitHub Secrets setup.")
         return
         
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
     
     try:
@@ -84,7 +86,6 @@ def run_screener():
                 print(f"Skipping feed. Status code: {response.status_code}")
                 continue
                 
-            # FIX: Switched parser to 'html.parser' to avoid environment dependency errors
             soup = BeautifulSoup(response.content, 'html.parser')
             entries = soup.find_all('entry') or soup.find_all('item')
             
