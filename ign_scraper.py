@@ -4,11 +4,10 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 
 # ==========================================
-# USER ROUTING INTERFACES
+# IGN SYNDICATION HOOKS
 # ==========================================
-# Official tracking nodes mapping across general content categories
-IGN_REVIEW_FEED = "https://corp.ign.com/feeds"  # Reference framework
-TARGET_FEED = "https://www.ign.com/rss/articles/reviews" # Primary RSS matrix targeting reviews across all nodes
+# Using the primary, ultra-stable Feedburner route for all categories
+TARGET_FEED = "http://feeds.feedburner.com/ign/all.xml"
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
@@ -29,51 +28,44 @@ def send_telegram_notification(message):
     try:
         response = requests.post(url, json=payload, timeout=15)
         if response.status_code == 200:
-            print("IGN structural metrics posted successfully!")
+            print("IGN review metrics posted successfully!")
         else:
             print(f"Telegram Interface rejected deployment payload: {response.text}")
     except Exception as e:
         print(f"Failed dispatching to API pipeline endpoint: {e}")
 
 def scrape_ign_reviews():
-    print(f"Initializing IGN structural extraction engine...")
+    print(f"Initializing IGN global extraction engine...")
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     
     try:
         response = requests.get(TARGET_FEED, headers=headers, timeout=20)
         if response.status_code != 200:
-            print(f"Target node unreachable. Network response code dropped: {response.status_code}")
+            print(f"Target syndicate endpoint down. Network code dropped: {response.status_code}")
             return
             
         soup = BeautifulSoup(response.content, 'html.parser')
         items = soup.find_all('item')
         
-        # Guard clause against empty structural trees
-        if not items:
-            # Fallback scan mapping for dynamic atom tags
-            items = soup.find_all('entry')
-            
         extracted_reviews = []
         
-        # Fetching the top 8 recent multi-category tracked elements
-        for item in items[:8]:
+        for item in items:
             title = item.find('title').text.strip() if item.find('title') else "Unknown Review Title"
             
-            # Map structural routing path back to explicit web resource
+            # Filter Strategy: Ensure we are only picking items explicitly tagged as a "Review"
+            if "review" not in title.lower():
+                continue
+                
             link = ""
             if item.find('link'):
                 link = item.find('link').text.strip()
-                if not link and item.find('link').get('href'):
-                    link = item.find('link').get('href')
             
-            # Check description summary elements for embedded parameters
             description_tag = item.find('description') or item.find('summary')
             description = description_tag.text.strip() if description_tag else "No review summary payload available."
-            # Clean HTML codes from description data string
-            description = BeautifulSoup(description, "html.parser").text[:120] + "..."
+            # Strip internal tags and clamp text safely
+            description = BeautifulSoup(description, "html.parser").text[:120].strip() + "..."
             
-            # Video route fallback architecture:
-            # Since video components change dynamically, this maps direct user entry straight into the video-review loop
+            # Clean video suffix injection
             video_link = link + "-video" if link and not link.endswith('/') else link
             
             extracted_reviews.append({
@@ -82,6 +74,10 @@ def scrape_ign_reviews():
                 "url": link,
                 "video": video_link
             })
+            
+            # Cap execution processing depth at the top 5 most recent reviews
+            if len(extracted_reviews) >= 5:
+                break
             
         if extracted_reviews:
             alert_payload = f"🎮 <b>IGN Top Multi-Category Review Metrics</b> 🎮\n"
@@ -95,7 +91,7 @@ def scrape_ign_reviews():
                 
             send_telegram_notification(alert_payload)
         else:
-            print("No parsed items matched target array bounds.")
+            print("No matches tracked containing review tags during this feed cycle.")
             
     except Exception as e:
         print(f"Scraper core crashed: {e}")
