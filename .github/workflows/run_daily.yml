@@ -23,11 +23,10 @@ jobs:
     - name: Fetch Pipeline Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests beautifulsoup4
+        pip install requests beautifulsoup4 lxml
 
     - name: Run Profile Matcher Scraper
       env:
-        # UPDATED: Changed from TELEGRAM_BOT_TOKEN to TELEGRAM_TOKEN
-        TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       run: python scraper.py
