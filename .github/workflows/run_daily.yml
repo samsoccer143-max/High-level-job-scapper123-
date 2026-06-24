@@ -1,28 +1,32 @@
-name: Daily Govt Job Monitor
+name: Live Govt Job Screener
 
 on:
   schedule:
-    # Runs automatically every single day at 05:00 AM UTC (10:30 AM Indian Standard Time)
-    - cron: '0 5 * * *'
-  workflow_dispatch: # Allows you to also trigger it manually anytime with a single click
+    # Runs automatically every single day at 03:00 AM UTC (8:30 AM IST)
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    # Keeps a manual trigger button active in your GitHub actions panel
 
 jobs:
-  run-scraper:
+  execute-pipeline:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository code
-        uses: actions/checkout@v4
+    - name: Pull Repository Files
+      uses: actions/checkout@v4
 
-      - name: Initialize Cloud Python Engine
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+    - name: Initialize Python Core
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
 
-      - name: Install Scraper Requirements
-        run: pip install requests beautifulsoup4
+    - name: Fetch Pipeline Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests beautifulsoup4 lxml
 
-      - name: Run Scraper Script
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python scraper.py
+    - name: Run Profile Matcher Scraper
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      run: python scraper.py
