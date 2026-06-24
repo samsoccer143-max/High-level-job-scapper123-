@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 
 # --- PULL IN KEYS FROM SECURE GITHUB VAULT ---
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_ID")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 PORTALS = {
     "National Career Service": "https://betacloud.ncs.gov.in/latest-update",
@@ -46,11 +46,13 @@ def run_pipeline():
             print(f"Skipping {name} due to an error: {e}")
             continue
 
+    # --- UPDATED NOTIFICATION LOGIC ---
     if consolidated_matches:
         alert_body = "🚀 *New High-Pay Govt Tech Jobs Found!*\n\n" + "\n\n".join(consolidated_matches)
         send_telegram_alert(alert_body)
     else:
-        print("Scan complete. No high-pay roles posted today.")
+        # This will send a message to your phone even if nothing was found
+        send_telegram_alert("🔍 *Daily Scan Complete:* No new high-paying tech roles posted on the portals today.")
 
 if __name__ == "__main__":
     run_pipeline()
